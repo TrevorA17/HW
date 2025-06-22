@@ -25,8 +25,19 @@ import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { Menu } from "@mui/material";
+import { SuccessAlert } from "../../snackBar Alerts/successAlert";
+import { ErrorAlert } from "../../snackBar Alerts/errorAlert";
+// import WarningIcon from "../../../School/Images/warning-remove-icn.svg";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";  
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+
+
 
 let baseUrl = import.meta.env.VITE_BASE_URL;
+import HttpComponent from './../../School/MakeRequest';
 
 const AntTabs = styled(TabList)({
   borderBottom: "3px solid #e8e8e8",
@@ -432,8 +443,6 @@ const ParentProfile = (props) => {
   };
 
 const handleAddSecondaryParent = () => {
-  localStorage.setItem("studentsetup", "goToStudent");
-  localStorage.setItem("primaryParentId", customerId); // Store reference
   navigate("/school/parent/add");
 };
 
@@ -451,13 +460,71 @@ const handleAddSecondaryParent = () => {
 };
 
 
-  const handleDeleteSecondaryParent = () => {
-    // You can use a confirmation dialog here
-    console.log("Deleting secondary parent", secondaryParentData?.customerId);
-  };
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [errorShow, setErrorShow] = useState({ state: false, message: "" });
+  const [successShow, setSuccessShow] = useState({ state: false, message: "" });
+  const [gridLoading, setGridLoading] = useState(false);
 
-  return (
+  const handleDeleteSecondaryParent = () => {
+  setDeleteDialogOpen(true);
+};
+
+const handleConfirmDelete = () => {
+  setDeleteDialogOpen(false);
+  setGridLoading(true);
+
+  HttpComponent({
+    method: 'GET',
+    url: `/api/suspendCustomer?customerId=${secondaryParentData?.customerId}`,
+    body: null,
+    token: localStorage.getItem("X-Authorization")
+  })
+    .then((data) => {
+      if (data.status === 202) {
+        setSuccessShow({
+          state: true,
+          message: "Secondary parent deactivated successfully"
+        });
+        setSecondaryParentData(null);
+        setSecondaryParentModal(false);
+        if (typeof fetchParents === "function") fetchParents();
+      } else {
+        setErrorShow({
+          state: true,
+          message: data.response?.message || "Failed to deactivate secondary parent"
+        });
+      }
+    })
+    .catch((error) => {
+      console.error("Error suspending secondary parent:", error);
+      setErrorShow({
+        state: true,
+        message: error.message || "An error occurred"
+      });
+    })
+    .finally(() => {
+      setGridLoading(false);
+    });
+};
+
+
+
+    return (
     <>
+    <SuccessAlert
+  vertical="top"
+  horizontal="right"
+  onClose={() => setSuccessShow({ ...successShow, state: false })}
+  open={successShow.state}
+  message={successShow.message} 
+/>
+<ErrorAlert
+  vertical="top"
+  horizontal="right"
+  onClose={() => setErrorShow({ ...errorShow, state: false })}
+  open={errorShow.state}
+  message={errorShow.message}
+/>
       <Grid container marginBottom="10px">
         <Grid item style={{ width: "100%" }}>
         <div
@@ -552,7 +619,7 @@ const handleAddSecondaryParent = () => {
                 <MenuItem onClick={() => { handleEditSecondaryParent(); setSecondaryMenuAnchor(null); }}>
                   Edit Parent
                 </MenuItem>
-                <MenuItem onClick={() => { handleDeleteSecondaryParent(); setSecondaryMenuAnchor(null); }}>
+                <MenuItem onClick={() => { handleDeleteSecondaryParent(); setSecondaryMenuAnchor(null);}}sx={{ color: '#DC3545' }}>
                   Delete
                 </MenuItem>
               </Menu>
@@ -664,7 +731,12 @@ const handleAddSecondaryParent = () => {
                     <MenuItem onClick={() => { handleEditProfile(); handleMenuClose(); }}>
                       Edit Profile
                     </MenuItem>
-                    <MenuItem onClick={() => { handleAddSecondaryParent(); handleMenuClose(); }}>
+                    <MenuItem onClick={() => {handleAddSecondaryParent(); handleMenuClose();}}
+                      disabled={!secondaryParentModal && !secondaryParentData}
+                      sx={{
+                        color: (!secondaryParentModal && !secondaryParentData) ? '#a0a0a0' : 'inherit'
+                      }}
+                    >
                       Add Secondary Parent
                     </MenuItem>
                     <MenuItem onClick={() => { handleAddStudent(); handleMenuClose(); }}>
@@ -1011,7 +1083,71 @@ const handleAddSecondaryParent = () => {
         </Grid>
       </Grid>
       <CreateSchoolInvoiceModal modalOpen={createInvoiceModal} onClose={() => setCreateInvoiceModal(false)} />
+<Dialog 
+  open={deleteDialogOpen} 
+  onClose={() => setDeleteDialogOpen(false)}
+>
+  <DialogTitle sx={{ display: "flex", alignItems: "center", gap: "15px" }}>
+    <Box>
+      {/* <img src={WarningIcon} alt="warning icon" width={70} height={70} /> */}
+    </Box>
+    <Box>
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: "600",
+          color: "#032541",
+          fontSize: "16px",
+          fontFamily: "Poppins",
+        }}
+      >
+        Delete Secondary Parent?
+      </Typography>
+      <DialogContentText>
+        Are you sure you want to delete the secondary parent <br />{" "}
+        <strong style={{ color: "#032541" }}>
+          {secondaryParentData?.firstName} {secondaryParentData?.lastName}
+        </strong>{" "}
+        ?
+      </DialogContentText>
+    </Box>
+  </DialogTitle>
+  <DialogActions sx={{ justifyContent: "center", marginBottom: "30px" }}>
+    <Button
+      style={{
+        height: "45px",
+        width: "125px",
+        marginRight: "20px",
+        borderRadius: "4px",
+        border: "1px solid #002543",
+        color: "#002543",
+        fontSize: "14px",
+        fontWeight: "500",
+        fontFamily: "Poppins",
+      }}
+      onClick={() => setDeleteDialogOpen(false)}
+    >
+      Cancel
+    </Button>
+    <Button
+      style={{
+        height: "45px",
+        width: "125px",
+        fontSize: "14px",
+        fontWeight: "600",
+        fontFamily: "Poppins",
+      }}
+      onClick={handleConfirmDelete}
+      color="error"
+      variant="contained"
+    >
+      Delete
+    </Button>
+  </DialogActions>
+</Dialog>
+
     </>
+    
   );
 };
 
